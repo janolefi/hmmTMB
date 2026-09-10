@@ -21,9 +21,12 @@ library(fmesher)
 
 
 # Simulate ----------------------------------------------------------------
+## The simulation could represent an animal movement example, where we know
+## the animal's position at each time point, but the data stream we model
+## via the HMM is not derived from position, e.g. overall dynamic body acceleration.
 
 set.seed(3)
-n <- 2000
+n <- 4000
 
 ## A track wandering over the unit square
 x <- y <- numeric(n)
@@ -34,7 +37,7 @@ for (t in 2:n) {
 }
 
 ## The true field, on the linear predictor of Pr(state 2 -> state 1)
-field <- function(x, y) 1.5 * sin(4 * x) * cos(4 * y)
+field <- function(x, y) 2 * sin(5 * x) * cos(2.5 * y)
 
 ## Two states: state 1 is "resting" (low mean), state 2 is "active"
 states <- numeric(n)
@@ -55,8 +58,8 @@ data <- data.frame(ID = 1, x = x, y = y, z = rnorm(n, c(0, 4)[states], 1))
 ## extension of about one range, without which the field's variance is
 ## inflated at the boundary.
 mesh <- fm_mesh_2d(loc = cbind(data$x, data$y),
-                   max.edge = c(0.15, 0.5),
-                   cutoff = 0.08,
+                   max.edge = c(0.1, 0.5),
+                   cutoff = 0.06,
                    offset = c(0.1, 0.3))
 plot(mesh, asp = 1)
 points(data$x, data$y, pch = 20, cex = 0.4, col = "#00798c40")
@@ -85,7 +88,7 @@ hmm <- HMM$new(hid = hid, obs = obs)
 ## bandwidth of 15
 hmm$bw()
 
-system.time(hmm$fit(silent = TRUE))
+system.time(hmm$fit())
 
 
 # Check the bandwidth -----------------------------------------------------
@@ -96,10 +99,11 @@ system.time(hmm$fit(silent = TRUE))
 ## estimates: if the curve has flattened well before the bandwidth in use,
 ## the approximation is fine.
 hmm$check_bw(bws = seq(5, 30, by = 5))
+# We could have gotten away with using bw = 10 in this case.
 
-## If it has not, raise it and refit:
-# hmm$update_bw(30)
-# hmm$fit(silent = TRUE)
+## If likelihood had not stabiliseed, we would raise it and refit:
+# hmm$update_bw(20)
+# hmm$fit()
 
 
 # Results -----------------------------------------------------------------
@@ -121,13 +125,18 @@ tpm <- hmm$predict("tpm", newdata = grid)
 par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
 image(unique(grid$x), unique(grid$y),
       matrix(plogis(-0.5 + field(grid$x, grid$y)), 150, 150),
-      col = hcl.colors(50), asp = 1, xlab = "x", ylab = "y",
-      main = "True Pr(active -> resting)", zlim = c(0, 1))
+      col = hcl.colors(30), asp = 1, xlab = "x", ylab = "y",
+      main = "True Pr(active -> resting)", zlim = c(0, 1), bty = "n")
 image(unique(grid$x), unique(grid$y),
       matrix(tpm[2, 1, ], 150, 150),
-      col = hcl.colors(50), asp = 1, xlab = "x", ylab = "y",
-      main = "Estimated", zlim = c(0, 1))
+      col = hcl.colors(30), asp = 1, xlab = "x", ylab = "y",
+      main = "Estimated", zlim = c(0, 1), bty = "n")
 par(mfrow = c(1, 1))
+
+range(matrix(plogis(-0.5 + field(grid$x, grid$y)), 150, 150))
+range(matrix(tpm[2, 1, ], 150, 150))
+# estimated field is smoothed to zero slightly
+# -> sine/cosine structure is very unlikely under a Matérn covariance
 
 ## Correlation between the fitted and the true surface, on the linear
 ## predictor scale
@@ -135,3 +144,6 @@ cor(qlogis(tpm[2, 1, ]), -0.5 + field(grid$x, grid$y))
 
 ## Decoded states
 table(hmm$viterbi(), states)
+
+
+
