@@ -128,6 +128,10 @@ cov_grid <- function(var, data = NULL, obj = NULL, covs = NULL, formulas, n_grid
     data$pi <- pi
   }
   
+  # Drop anything that is not a column of the data (e.g. an SPDE mesh named
+  # in a smooth's 'xt' argument)
+  var_names <- intersect(var_names, colnames(data))
+  
   # Get data frame of covariates
   all_vars <- data[, var_names, drop = FALSE]
   

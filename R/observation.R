@@ -188,6 +188,9 @@ Observation <- R6Class(
       cov_names <- unique(rapply(self$formulas(), all.vars))
       # Remove pi from list of covariates if it is in the formulas
       cov_names <- cov_names[which(cov_names!="pi")]
+      # Drop anything that is not a column of the data (e.g. an SPDE mesh
+      # named in a smooth's 'xt' argument)
+      cov_names <- intersect(cov_names, colnames(data))
       if(length(cov_names) > 0) {
         # Remove NAs in covariates (replace by last non-NA value)
         data[,cov_names] <- lapply(data[,cov_names, drop=FALSE], 
@@ -201,12 +204,14 @@ Observation <- R6Class(
       ncol_re <- mats$ncol_re
       private$terms_ <- c(mats, list(names_fe = colnames(mats$X_fe),
                                      names_re_all = colnames(mats$X_re),
-                                     names_re = colnames(ncol_re)))
+                                     names_re = mats$sp_names))
       
       # Initialise parameters      
       self$update_coeff_fe(rep(0, sum(ncol_fe)))
       self$update_coeff_re(rep(0, ncol(mats$X_re)))
-      self$update_lambda(rep(1, ifelse(is.null(ncol_re), 0, ncol(ncol_re))))
+      # Each smooth's constructor supplies its own starting values; an
+      # ordinary smooth says 0 on the log scale, i.e. lambda = 1
+      self$update_lambda(exp(mats$theta_start))
       
       # Make sure par is in right order
       corrected_par <- vector(mode = "list", length = n_var)
@@ -394,7 +399,15 @@ Observation <- R6Class(
     #' each smooth term into a standard deviation, given by 
     #' SD = 1/sqrt(lambda). It is particularly helpful to get the
     #' standard deviations of independent normal random effects.
-    sd_re = function() {return(1/sqrt(private$lambda_))},
+    #' A smooth with its own parameterisation rather than a single smoothness
+    #' parameter -- a Gaussian field, whose parameters are already a marginal
+    #' standard deviation and a range -- has no such transformation and
+    #' returns NA; read those off \code{lambda()} directly.
+    sd_re = function() {
+      sd <- 1/sqrt(private$lambda_)
+      sd[self$terms()$sp_gmrf == 1] <- NA
+      return(sd)
+    },
     
     #' @description List of model formulas for observation model
     #' 

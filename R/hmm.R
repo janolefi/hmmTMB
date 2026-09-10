@@ -45,6 +45,9 @@ HMM <- R6Class(
     #' factor levels).don See examples in the vignettes, and check the TMB
     #' documentation to understand the inner workings (argument \code{map}
     #' of \code{TMB::MakeADFun()}).
+    #' @param bw Bandwidth of the banded forward algorithm, see
+    #' \code{HMM$update_bw()}. Defaults to \code{NULL}, i.e. 15 if the model
+    #' contains a Gaussian field and 0 (the exact algorithm) otherwise.
     #'
     #' @return A new HMM object
     #'
@@ -66,7 +69,8 @@ HMM <- R6Class(
                           hid = NULL,
                           file = NULL,
                           init = NULL,
-                          fixpar = NULL) {
+                          fixpar = NULL,
+                          bw = NULL) {
       # Decide how model has been specified
       if (is.null(file) & is.null(obs)) {
         stop(paste0("Either 'file' should be the name of a file specifying ",
@@ -97,8 +101,12 @@ HMM <- R6Class(
                             rapply(obs$formulas(), all.vars)))
       # Remove pi from list of covariates if it is in the formulas
       var_names <- var_names[which(var_names!="pi")]
+      # Drop anything that is not a column of the data: a smooth's 'xt'
+      # argument may name an object that is not a covariate, such as an
+      # SPDE mesh, and all.vars() cannot tell the two apart
+      data <- obs$data()
+      var_names <- intersect(var_names, colnames(data))
       if(length(var_names) > 0) {
-        data <- obs$data()
         # Remove NAs in covariates (replace by last non-NA value)
         data[,var_names] <- lapply(data[,var_names, drop=FALSE],
                                    function(col) na_fill(col))
@@ -129,6 +137,9 @@ HMM <- R6Class(
         private$hid_$update_coeff_re(
           private$initialize_submodel(private$hid_$coeff_re(), init$hid()$coeff_re()))
       }
+
+      # Bandwidth of the forward algorithm
+      self$update_bw(bw)
 
       # initialize priors
       self$set_priors()
@@ -246,6 +257,76 @@ HMM <- R6Class(
     lambda = function() {
       return(list(obs = self$obs()$lambda(),
                   hid = self$hid()$lambda()))
+    },
+
+    #' @description Bandwidth of the forward algorithm (0 = exact)
+    bw = function() {
+      return(private$bw_)
+    },
+
+    #' @description Update bandwidth of the forward algorithm
+    #'
+    #' The exact forward algorithm accumulates log-likelihood contributions
+    #' that are each conditional on the entire process history, so the Hessian
+    #' with respect to latent variables spread over time is dense. The banded
+    #' algorithm of Fischer (2026) splits the time series into blocks of length
+    #' \code{bw} and truncates that conditioning at the previous block, which
+    #' makes the Hessian banded and the Laplace approximation affordable. It
+    #' costs about twice as much per evaluation, and its error decays
+    #' geometrically in \code{bw}.
+    #'
+    #' A model containing a Gaussian field is banded by default, with
+    #' \code{bw = 15}. That is a starting point, not an answer: the required
+    #' bandwidth depends on how fast the chain forgets its initial condition,
+    #' so a persistent chain needs more. Use \code{HMM$check_bw()} to profile
+    #' the log-likelihood against \code{bw} before fitting, and afterwards
+    #' check that raising \code{bw} leaves the estimates unchanged.
+    #'
+    #' @param bw Non-negative integer (0 = exact algorithm), or \code{NULL} to
+    #' choose automatically. This is TMB data, so changing it discards any
+    #' existing setup, which is rebuilt on the next \code{setup()} or
+    #' \code{fit()}.
+    update_bw = function(bw = NULL) {
+      if(is.null(bw)) {
+        bw <- if(private$has_gmrf()) 15L else 0L
+      }
+      if(length(bw) != 1 || is.na(bw) || bw != round(bw) || bw < 0 || bw == 1) {
+        stop("'bw' should be 0, an integer >= 2, or NULL.")
+      }
+      private$bw_ <- as.integer(bw)
+      private$tmb_obj_ <- NULL
+      private$tmb_obj_joint_ <- NULL
+      invisible(self)
+    },
+
+    #' @description Profile the log-likelihood against the bandwidth
+    #'
+    #' Evaluates the joint log-likelihood at the model's current parameter
+    #' values for a range of bandwidths. A sensible bandwidth is the smallest
+    #' one beyond which the value no longer changes appreciably. This is
+    #' evaluated at fixed parameters, so it is cheap and does not require the
+    #' model to be re-fitted.
+    #'
+    #' @param bws Vector of bandwidths (each at least 2)
+    #' @param silent Logical. If TRUE (default), TMB tracing output is hidden.
+    #'
+    #' @return Data frame with columns \code{bw} and \code{llk}, including a
+    #' row with \code{bw = Inf} for the exact forward algorithm.
+    check_bw = function(bws = seq(5, 40, by = 5), silent = TRUE) {
+      if(any(bws < 2)) {
+        stop("All bandwidths should be at least 2.")
+      }
+      if(is.null(private$tmb_args_)) {
+        self$setup(silent = silent)
+      }
+      # Every parameter is held fixed, random effects included, so this is the
+      # joint likelihood and no Laplace approximation is involved
+      llk <- sapply(c(bws, Inf), function(b) {
+        obj <- private$make_tmb_obj(bw = ifelse(is.finite(b), b, 0),
+                                    include_smooths = -1, silent = silent)
+        -obj$fn(obj$par)
+      })
+      return(data.frame(bw = c(bws, Inf), llk = llk))
     },
 
     #' @description Update parameters stored inside model object
@@ -536,6 +617,8 @@ HMM <- R6Class(
       S_obs <- mod_mat_obs$S
       log_det_S_obs <- mod_mat_obs$log_det_S
       ncol_re_obs <- mod_mat_obs$ncol_re
+      L_obs <- mod_mat_obs$L
+      gmrf_obs <- mod_mat_obs$gmrf
 
       # Create model matrices of hidden state process
       # (Design matrices for fixed and random effects, and smoothing matrix)
@@ -545,6 +628,8 @@ HMM <- R6Class(
       S_hid <- mod_mat_hid$S
       log_det_S_hid <- mod_mat_hid$log_det_S
       ncol_re_hid <- mod_mat_hid$ncol_re
+      L_hid <- mod_mat_hid$L
+      gmrf_hid <- mod_mat_hid$gmrf
 
       # Prepare initial distribution delta0
       ldelta0 <- self$hid()$delta0(log = TRUE, as_matrix = FALSE)
@@ -571,6 +656,8 @@ HMM <- R6Class(
         S_obs <- as_sparse(matrix(0, 1, 1))
         log_det_S_obs <- -1
         ncol_re_obs <- matrix(-1, nr = 1, nc = 1)
+        L_obs <- matrix(1, 1, 1)
+        gmrf_obs <- 0L
         X_re_obs <- as_sparse(rep(0, nrow(X_fe_obs)))
       } else {
         # If there are random effects,
@@ -589,6 +676,8 @@ HMM <- R6Class(
         S_hid <- as_sparse(matrix(0, 1, 1))
         log_det_S_hid <- -1
         ncol_re_hid <- matrix(-1, nr = 1, nc = 1)
+        L_hid <- matrix(1, 1, 1)
+        gmrf_hid <- 0L
         X_re_hid <- as_sparse(rep(0, nrow(X_fe_hid)))
       } else {
         # If there are random effects,
@@ -671,12 +760,17 @@ HMM <- R6Class(
                       S_obs = as_sparse(S_obs),
                       log_det_S_obs = log_det_S_obs,
                       ncol_re_obs = ncol_re_obs,
+                      L_obs = L_obs,
+                      gmrf_obs = gmrf_obs,
                       X_fe_hid = as_sparse(X_fe_hid),
                       X_re_hid = as_sparse(X_re_hid),
                       S_hid = as_sparse(S_hid),
                       log_det_S_hid = log_det_S_hid,
                       ncol_re_hid = ncol_re_hid,
+                      L_hid = L_hid,
+                      gmrf_hid = gmrf_hid,
                       include_smooths = 1,
+                      bw = 0,
                       ref_tpm = self$hid()$ref(),
                       ref_delta0 = self$hid()$ref_delta0(),
                       coeff_fe_obs_prior = priors$coeff_fe_obs,
@@ -684,11 +778,24 @@ HMM <- R6Class(
                       log_lambda_obs_prior = priors$log_lambda_obs,
                       log_lambda_hid_prior = priors$log_lambda_hid)
 
+      # Keep the ingredients, so that check_bw() can rebuild at another
+      # bandwidth without redoing any of the above
+      private$tmb_args_ <- list(data = tmb_dat, parameters = tmb_par,
+                                map = map, DLL = "hmmTMB")
+
       # Create TMB model
-      obj <- MakeADFun(tmb_dat, tmb_par, DLL = "hmmTMB",
-                       random = random,
-                       map = map,
-                       silent = silent)
+      obj <- private$make_tmb_obj(bw = self$bw(), include_smooths = 1,
+                                  random = random, silent = silent)
+
+      if(self$bw() >= 2 && private$has_gmrf() &&
+         isTRUE(obj$report()$ad_framework == 0)) {
+        warning(paste("This model contains a Gaussian field, whose precision",
+                      "matrix has to be factorised inside the likelihood, but",
+                      "hmmTMB was compiled with the CppAD framework, under",
+                      "which that is very slow. Reinstall without setting",
+                      "HMMTMB_AD_FRAMEWORK to use the TMBad framework."),
+                call. = FALSE)
+      }
 
       nllk0 <- obj$fn(obj$par)
       if(is.nan(nllk0) | is.infinite(nllk0)) {
@@ -701,9 +808,8 @@ HMM <- R6Class(
       private$tmb_obj_ <- obj
 
       # Joint negative log-likelihood function
-      tmb_dat$include_smooths <- -1
-      private$tmb_obj_joint_ <- MakeADFun(tmb_dat, tmb_par, DLL = "hmmTMB",
-                                          map = map, silent = silent)
+      private$tmb_obj_joint_ <- private$make_tmb_obj(
+        bw = self$bw(), include_smooths = -1, silent = silent)
     },
 
     #' @description Fit model using tmbstan
@@ -2009,6 +2115,8 @@ HMM <- R6Class(
     par_iters_ = NULL,
     coeff_array_ = NULL,
     states_ = NULL,
+    bw_ = NULL,
+    tmb_args_ = NULL,
 
     # Reading from spec file --------------------------------------------------
 
@@ -2226,6 +2334,24 @@ HMM <- R6Class(
     },
 
     # Other private methods ---------------------------------------------------
+
+    ## Build a TMB object from the stored ingredients. Bandwidth and
+    ## include_smooths are data, so changing either means retaping.
+    make_tmb_obj = function(bw, include_smooths, random = NULL, silent = TRUE) {
+      if(is.null(private$tmb_args_)) {
+        stop("Setup model first")
+      }
+      args <- private$tmb_args_
+      args$data$bw <- as.integer(bw)
+      args$data$include_smooths <- as.integer(include_smooths)
+      do.call(MakeADFun, c(args, list(random = random, silent = silent)))
+    },
+
+    ## Does the model contain a smooth whose precision depends on its
+    ## parameters, i.e. a Gaussian field?
+    has_gmrf = function() {
+      any(c(self$obs()$terms()$gmrf, self$hid()$terms()$gmrf) == 1)
+    },
 
     ## Compute effective degrees of freedom for a GAM
     comp_edf = function(X, S, lambda){
