@@ -16,6 +16,15 @@
 - Fix the log-determinant of penalty matrices when one linear predictor
   contains several smooths, which biased their smoothing parameters.
 - Build prediction matrices without fitting a throwaway `mgcv::gam()`.
+- Sample from the precision matrix rather than from its inverse in
+  `HMM$post_coeff()`, through a sparse Cholesky factorisation. Drawing 1000
+  posterior samples from a model with a 3400-node field takes 0.6s instead of
+  26s, and no longer forms a dense matrix of the same size. The precision
+  itself -- TMB's joint precision with random effects, the Hessian without --
+  is exposed as `HMM$post_prec()` and cached.
+- `HMM$confint()` no longer inverts the joint precision. It needs only the
+  covariance of the fixed effects, which is the leading block of that inverse
+  and is what `TMB::sdreport()` already returns as `cov.fixed`.
 - New vignette on (semi-)supervised learning
 - Fix parameter counts for models with constraints
 - Use safe Hessian inversion even for models without random effects in `HMM$post_coeff()` and `HMM$confint()`

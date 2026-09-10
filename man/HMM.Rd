@@ -111,6 +111,7 @@ hmm$predict(what = "tpm", n_post = 1000)
 \item \href{#method-HMM-viterbi}{\code{HMM$viterbi()}}
 \item \href{#method-HMM-sample_states}{\code{HMM$sample_states()}}
 \item \href{#method-HMM-state_probs}{\code{HMM$state_probs()}}
+\item \href{#method-HMM-post_prec}{\code{HMM$post_prec()}}
 \item \href{#method-HMM-post_coeff}{\code{HMM$post_coeff()}}
 \item \href{#method-HMM-post_linpred}{\code{HMM$post_linpred()}}
 \item \href{#method-HMM-post_fn}{\code{HMM$post_fn()}}
@@ -829,6 +830,35 @@ Compute posterior probability of being in each state
 \subsection{Returns}{
 matrix with a row for each observation and a column for each state
 }
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HMM-post_prec"></a>}}
+\if{latex}{\out{\hypertarget{method-HMM-post_prec}{}}}
+\subsection{Method \code{post_prec()}}{
+Precision matrix of the estimator distribution
+
+The matrix that \code{HMM$post_coeff()} samples from, over the fixed
+effects and, where the model has them, the random effects too. It is the
+joint precision returned by \code{TMB::sdreport()} for a model with
+random effects, and the Hessian of the negative log-likelihood at the
+estimates otherwise.
+
+Sampling goes through the precision rather than through its inverse
+because the joint precision is sparse and can be very large -- one row
+per weight of a Gaussian field -- and inverting it costs far more than
+the sparse Cholesky that \code{rmvn_prec()} uses instead. On a
+3400-node mesh that is the difference between 26 seconds and half a
+second for a thousand draws. A model without random effects has a small
+dense Hessian, which is a sparse matrix with no zeros and costs no more
+sampled the same way.
+
+Computed once and cached, because obtaining the Hessian of a
+fixed-effects-only model costs an automatic differentiation pass that
+repeated calls to \code{post_coeff()} should not repeat.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{HMM$post_prec()}\if{html}{\out{</div>}}
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HMM-post_coeff"></a>}}
