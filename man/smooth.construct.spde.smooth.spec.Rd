@@ -45,9 +45,10 @@ place where a field does not behave like the smooths around it. The range is
 estimated and is what does the smoothing, so \code{k} is not a cap on
 wiggliness that the penalty then pulls back from: it only has to be large
 enough to resolve the range the data ask for, knots about a third of a range
-apart as in two dimensions. That is why the default is \code{k = 20} rather
-than \code{mgcv}'s 10 -- with the widening, 20 knots resolve a range of about
-a fifth of the spread of the covariate, which is where the range starts.
+apart as in two dimensions. That is why the default is \code{k = 15} rather
+than \code{mgcv}'s 10 -- with the widening, 15 knots put the knot spacing at
+about half the range the smoother starts from, which is a fifth of the
+spread of the covariate.
 
 Too small a \code{k} does not simply oversmooth. Once the knots are further
 apart than the range the data want, the weights are near enough independent

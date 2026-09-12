@@ -40,9 +40,10 @@
 #' estimated and is what does the smoothing, so \code{k} is not a cap on
 #' wiggliness that the penalty then pulls back from: it only has to be large
 #' enough to resolve the range the data ask for, knots about a third of a range
-#' apart as in two dimensions. That is why the default is \code{k = 20} rather
-#' than \code{mgcv}'s 10 -- with the widening, 20 knots resolve a range of about
-#' a fifth of the spread of the covariate, which is where the range starts.
+#' apart as in two dimensions. That is why the default is \code{k = 15} rather
+#' than \code{mgcv}'s 10 -- with the widening, 15 knots put the knot spacing at
+#' about half the range the smoother starts from, which is a fifth of the
+#' spread of the covariate.
 #'
 #' Too small a \code{k} does not simply oversmooth. Once the knots are further
 #' apart than the range the data want, the weights are near enough independent
@@ -257,19 +258,19 @@ spde_loc <- function(term, data) {
 #' knots would not give \code{k} of them; \code{k} keeps its mgcv meaning of a
 #' basis dimension here, and \code{k + 1} knots are laid down.
 #'
-#' The default of 20 is twice mgcv's, because \code{k} is a resolution here and
-#' not a cap on wiggliness: with the widening, 20 knots put the knot spacing at
-#' about a third of the range the smoother starts from, which is the same rule
-#' of thumb as \code{max.edge} in two dimensions. Ten of them do not, and the
-#' range collapses towards zero as a result.
+#' The default of 15 is above mgcv's 10, because \code{k} is a resolution here
+#' and not a cap on wiggliness: with the widening, 15 knots put the knot
+#' spacing at about half the range the smoother starts from, in the spirit of
+#' \code{max.edge} in two dimensions. Ten of them leave the knots further apart
+#' than that range, and it collapses towards zero as a result.
 #'
 #' @param x The covariate
 #' @param k Basis dimension, as passed to \code{s()}; negative when the user
-#'   gave none, in which case 20 is used
+#'   gave none, in which case 15 is used
 #'
 #' @return An \code{fm_mesh_1d} with \code{k} basis functions
 spde_mesh_1d <- function(x, k) {
-  if(is.null(k) || k < 0) k <- 20
+  if(is.null(k) || k < 0) k <- 15
   if(k < 3) {
     stop("An SPDE smooth needs k of at least 3, not ", k, ".", call. = FALSE)
   }

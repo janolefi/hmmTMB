@@ -127,7 +127,7 @@ test_that("a one-dimensional SPDE smooth builds its own mesh", {
   set.seed(1)
   data <- data.frame(x = stats::runif(200, 2, 8))
 
-  # k is a basis dimension, as everywhere else in mgcv, but defaults to 20
+  # k is a basis dimension, as everywhere else in mgcv, but defaults to 15
   # rather than 10: it is the resolution of the field, not a cap on wiggliness
   # that a penalty pulls back from. A degree-2 mesh has one basis function
   # fewer than it has knots, so the two can only agree if the knots are
@@ -135,7 +135,7 @@ test_that("a one-dimensional SPDE smooth builds its own mesh", {
   sm <- mgcv::smoothCon(mgcv::s(x, bs = "spde"), data = data,
                         absorb.cons = FALSE)[[1]]
   expect_s3_class(sm$mesh, "fm_mesh_1d")
-  expect_equal(ncol(sm$X), 20L)
+  expect_equal(ncol(sm$X), 15L)
   expect_equal(sm$mesh$degree, 2)
   expect_equal(ncol(mgcv::smoothCon(mgcv::s(x, k = 25, bs = "spde"), data = data,
                                     absorb.cons = FALSE)[[1]]$X), 25L)
@@ -145,7 +145,7 @@ test_that("a one-dimensional SPDE smooth builds its own mesh", {
   # variance where the data are
   pad <- diff(range(data$x)) / 5
   expect_equal(range(sm$mesh$loc), range(data$x) + c(-pad, pad))
-  expect_equal(diff(sm$mesh$loc), rep(diff(range(sm$mesh$loc)) / 20, 20))
+  expect_equal(diff(sm$mesh$loc), rep(diff(range(sm$mesh$loc)) / 15, 15))
 
   mats <- hmmTMB:::make_matrices(list(a = ~ s(x, k = 15, bs = "spde")), data = data)
   expect_equal(unname(diff(mats$ncol_re[, 1]) + 1), 15)
@@ -299,9 +299,9 @@ test_that("a one-dimensional field can be fitted from the default mesh", {
   # The default mesh has to be fine enough that both parameters stay
   # interpretable. The failure mode of too coarse a mesh is not a flat fit but
   # a range that collapses towards zero with the standard deviation growing to
-  # compensate, which k = 10 does on this data set and k = 20 does not.
+  # compensate, which k = 10 does on this data set and k = 15 does not.
   sp <- hmm$lambda()$hid
-  spacing <- 1.4 * diff(range(data$x)) / 20     # the default mesh, widened
+  spacing <- 1.4 * diff(range(data$x)) / 15     # the default mesh, widened
   expect_gt(sp[2, 1], spacing)
   expect_lt(sp[1, 1], 10)
 })

@@ -5,7 +5,7 @@
   mgcv smooth is: `s(x, y, bs = "spde", xt = list(mesh = mesh))` in two
   dimensions, and `s(x, bs = "spde")` in one, where a mesh of `k` quadratic
   B-splines on evenly spaced knots is built for you over the range of the
-  covariate widened by a fifth on each side. `k` defaults to 20 rather than
+  covariate widened by a fifth on each side. `k` defaults to 15 rather than
   mgcv's 10, because it is the resolution of the field and not a cap on
   wiggliness: the range is estimated and is what does the smoothing. See
   `?smooth.construct.spde.smooth.spec` and `inst/examples/spde/spde_field.R`.

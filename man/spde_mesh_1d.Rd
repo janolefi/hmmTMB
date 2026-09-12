@@ -10,7 +10,7 @@ spde_mesh_1d(x, k)
 \item{x}{The covariate}
 
 \item{k}{Basis dimension, as passed to \code{s()}; negative when the user
-gave none, in which case 20 is used}
+gave none, in which case 15 is used}
 }
 \value{
 An \code{fm_mesh_1d} with \code{k} basis functions
@@ -30,9 +30,9 @@ A degree-2 mesh has one basis function fewer than it has knots, so \code{k}
 knots would not give \code{k} of them; \code{k} keeps its mgcv meaning of a
 basis dimension here, and \code{k + 1} knots are laid down.
 
-The default of 20 is twice mgcv's, because \code{k} is a resolution here and
-not a cap on wiggliness: with the widening, 20 knots put the knot spacing at
-about a third of the range the smoother starts from, which is the same rule
-of thumb as \code{max.edge} in two dimensions. Ten of them do not, and the
-range collapses towards zero as a result.
+The default of 15 is above mgcv's 10, because \code{k} is a resolution here
+and not a cap on wiggliness: with the widening, 15 knots put the knot
+spacing at about half the range the smoother starts from, in the spirit of
+\code{max.edge} in two dimensions. Ten of them leave the knots further apart
+than that range, and it collapses towards zero as a result.
 }
