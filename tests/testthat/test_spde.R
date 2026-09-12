@@ -6,12 +6,16 @@ test_that("an ordinary smooth still gets one penalty and one parameter", {
   set.seed(1)
   data <- data.frame(x = stats::runif(200), z = stats::runif(200))
   mats <- hmmTMB:::make_matrices(list(a = ~ s(x, k = 6, bs = "cs")), data = data)
+  G <- mgcv::gam(dummy_response ~ s(x, k = 6, bs = "cs"),
+                 data = cbind(dummy_response = 1, data), fit = FALSE)
 
   expect_equal(ncol(mats$ncol_re), 1)
   expect_equal(mats$L, matrix(1, 1, 1))
   expect_equal(mats$gmrf, 0L)
   expect_equal(mats$sp_gmrf, 0L)
-  expect_equal(mats$theta_start, 0)
+  # Started from mgcv's own value, scaled (see initial_lambda)
+  expect_equal(mats$theta_start,
+               log(mgcv::initial.sp(G$X, G$S, G$off)))
   expect_length(mats$log_det_S, 1)
 })
 
