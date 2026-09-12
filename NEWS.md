@@ -2,8 +2,18 @@
 # hmmTMB 1.1.3
 
 - Add latent Gaussian fields, as a Matern SPDE smoother usable anywhere an
-  mgcv smooth is: `s(x, y, bs = "spde", xt = list(mesh = mesh))`. See
+  mgcv smooth is: `s(x, y, bs = "spde", xt = list(mesh = mesh))` in two
+  dimensions, and `s(x, bs = "spde")` in one, where a mesh of `k` quadratic
+  B-splines on evenly spaced knots is built for you over the range of the
+  covariate widened by a fifth on each side. `k` defaults to 20 rather than
+  mgcv's 10, because it is the resolution of the field and not a cap on
+  wiggliness: the range is estimated and is what does the smoothing. See
   `?smooth.construct.spde.smooth.spec` and `inst/examples/spde/spde_field.R`.
+- `sd` and `range` now use the Matern constants of the dimension of the field.
+  With `alpha = 2` the smoothness is `nu = 2 - d/2`, so it is 3/2 in one
+  dimension and 1 in two, and both the marginal variance and the range enter
+  the precision differently. A one-dimensional field previously reported the
+  two-dimensional quantities, which were out by about a factor of two.
 - Add the banded forward algorithm of Fischer (2026), which is what makes a
   high-dimensional field affordable. New `bw` argument of `HMM$new()`, with
   `HMM$update_bw()` and `HMM$check_bw()`; on by default with `bw = 15` when

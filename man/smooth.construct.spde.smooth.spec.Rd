@@ -24,12 +24,53 @@ field, usable as \code{s(x, y, bs = "spde", xt = list(mesh = mesh))} in any
 hmmTMB formula, and so on any transition probability or any parameter of any
 observation distribution.
 }
-\section{Building a mesh}{
+\section{The mesh in one dimension}{
 
-The mesh is yours to build and pass in, because a good one depends on the
-domain, the data and the range you expect. \code{fmesher::fm_mesh_2d()}
-takes locations, a maximum triangle edge length inside the domain and in
-the outer extension, and a cutoff below which nearby points are merged:
+A one-dimensional field needs no mesh: \code{s(x, bs = "spde")} builds one
+by default, as \code{k} quadratic B-spline basis functions on evenly spaced
+knots, so
+
+\preformatted{
+f <- ~ s(x, bs = "spde")          # and s(x, bs = "spde", k = 40) for a finer one
+}
+
+is the whole of it. The knots are spread over the range of the covariate
+widened by a fifth on each side, which is the one-dimensional version of the
+outer extension of a two-dimensional mesh: with the knots stopping at the
+data, the boundary condition inflates the field's variance at the two ends
+by a third or more.
+
+\code{k} is a resolution, not a smoothing parameter, and this is the one
+place where a field does not behave like the smooths around it. The range is
+estimated and is what does the smoothing, so \code{k} is not a cap on
+wiggliness that the penalty then pulls back from: it only has to be large
+enough to resolve the range the data ask for, knots about a third of a range
+apart as in two dimensions. That is why the default is \code{k = 20} rather
+than \code{mgcv}'s 10 -- with the widening, 20 knots resolve a range of about
+a fifth of the spread of the covariate, which is where the range starts.
+
+Too small a \code{k} does not simply oversmooth. Once the knots are further
+apart than the range the data want, the weights are near enough independent
+that the likelihood cannot tell one short range from another, and the range
+collapses towards zero while the standard deviation grows to compensate. The
+fitted curve can still look right when that happens, because the basis is
+then doing the smoothing on its own, but the two parameters are meaningless.
+So read \code{lambda()} before reading the curve: a range far below the knot
+spacing, or a standard deviation orders of magnitude above the scale of the
+linear predictor, means raise \code{k} and refit.
+
+Passing your own \code{fmesher::fm_mesh_1d()} overrides all of this, and is
+worth doing when the covariate is unevenly spread and you want the knots
+placed accordingly.
+}
+
+\section{Building a mesh in two dimensions}{
+
+In two dimensions the mesh is yours to build and pass in, because a good one
+depends on the domain, the data and the range you expect.
+\code{fmesher::fm_mesh_2d()} takes locations, a maximum triangle edge length
+inside the domain and in the outer extension, and a cutoff below which
+nearby points are merged:
 
 \preformatted{
 mesh <- fmesher::fm_mesh_2d(loc = cbind(data$x, data$y),
@@ -40,9 +81,7 @@ f <- ~ s(x, y, bs = "spde", xt = list(mesh = mesh))
 
 A rule of thumb is \code{max.edge} no larger than a third of the range you
 expect, and an offset about equal to the range; without the outer extension
-the field's variance is inflated at the boundary. For one dimension pass a
-\code{fmesher::fm_mesh_1d()}, or leave \code{xt} out and a mesh with
-\code{k} evenly spaced knots is built over the range of the covariate.
+the field's variance is inflated at the boundary.
 
 The field is evaluated at every time step, so missing covariates are
 replaced by the last non-missing value as elsewhere in hmmTMB. If that is
@@ -54,10 +93,14 @@ too crude for locations, interpolate them before fitting.
 The precision is
 \deqn{Q(\tau, \kappa) = \tau^2(\kappa^4 C + 2\kappa^2 G_1 + G_2)}
 with \eqn{C}, \eqn{G_1}, \eqn{G_2} the finite element matrices from
-\code{fmesher::fm_fem()}. For \code{alpha = 2} in two dimensions the Matern
-smoothness is \eqn{\nu = 1}, the range is
-\eqn{\rho = \sqrt{8\nu}/\kappa = 2\sqrt2/\kappa} and the marginal standard
-deviation is \eqn{\sigma = 1/(\tau\kappa\sqrt{4\pi})}.
+\code{fmesher::fm_fem()}. \code{alpha = 2} throughout, so the Matern
+smoothness is \eqn{\nu = 2 - d/2}: \eqn{\nu = 1} in two dimensions and
+\eqn{\nu = 3/2} in one. The range is \eqn{\rho = \sqrt{8\nu}/\kappa} and
+the marginal standard deviation is
+\eqn{\sigma^2 = \Gamma(\nu) / (\Gamma(2)(4\pi)^{d/2}\kappa^{2\nu}\tau^2)},
+which is \eqn{1/(\tau^2\kappa^2 4\pi)} in two dimensions and
+\eqn{1/(4\tau^2\kappa^3)} in one. Both constants depend on \eqn{d}, so the
+one- and two-dimensional smoothers do not share them.
 
 The two estimated parameters are \eqn{\log\sigma} and \eqn{\log\rho}, not
 \eqn{\log\tau} and \eqn{\log\kappa}, and appear as \code{sd} and
@@ -92,8 +135,8 @@ See \code{HMM$update_bw()} and \code{HMM$check_bw()}.
 # A one-dimensional field over a covariate, with a default mesh
 if(requireNamespace("fmesher", quietly = TRUE)) {
   d <- data.frame(x = runif(100))
-  sm <- mgcv::smoothCon(mgcv::s(x, bs = "spde", k = 20), data = d)[[1]]
-  sm$theta.names
+  sm <- mgcv::smoothCon(mgcv::s(x, bs = "spde"), data = d)[[1]]
+  c(k = ncol(sm$X), sm$theta.names)
 }
 
 }

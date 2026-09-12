@@ -17,7 +17,7 @@ A positive number
 \description{
 The larger side of the bounding box of the mesh nodes that carry basis
 weight, which is the region the data occupy rather than the outer extension.
-A one-dimensional mesh stores its knots as a plain vector, and its degree-2
-basis has one more function than knots, so both the shape and the length of
-'loc' have to be taken as they come.
+A one-dimensional mesh stores its knots in 'loc' and the midpoints of its
+basis functions in 'mid', and only the latter are one per column of X, so
+'mid' is the one to use where there is a choice.
 }
