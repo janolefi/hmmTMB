@@ -15,6 +15,9 @@
 ### approximation unaffordable.
 ###
 ### Runs in well under a minute.
+###
+### If you use such a field with hmmTMB, please cite Fischer (2026) as well as
+### Lindgren, Rue and Lindstrom (2011).
 
 library(hmmTMB)
 library(fmesher)
@@ -26,7 +29,7 @@ library(fmesher)
 ## via the HMM is not derived from position, e.g. overall dynamic body acceleration.
 
 set.seed(3)
-n <- 4000
+n <- 4000 # spatial field in the tpm needs a lot of data to estimate precicely!
 
 ## A track wandering over the unit square
 x <- y <- numeric(n)
