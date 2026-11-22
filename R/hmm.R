@@ -303,7 +303,6 @@ HMM <- R6Class(
       private$bw_ <- as.integer(bw)
       private$tmb_obj_ <- NULL
       private$tmb_obj_joint_ <- NULL
-      private$tmb_obj_pen_ <- NULL
       invisible(self)
     },
 
@@ -555,16 +554,22 @@ HMM <- R6Class(
       # conditional on lambda, as in mgcv. (The covariance from jointPrecision
       # would not do: it also carries the uncertainty in lambda.)
       if(any(is_re)) {
-        is_coeff <- is_re | names(par) %in% c("coeff_fe_obs", "coeff_fe_hid")
-        H <- as.matrix(self$tmb_obj_joint()$he(par))[is_coeff, is_coeff]
-        # Penalised joint likelihood, built on first use and kept until the
-        # next setup()
-        if(is.null(private$tmb_obj_pen_)) {
-          private$tmb_obj_pen_ <- private$make_tmb_obj(bw = self$bw(),
-                                                       include_smooths = 1)
+        # Unpenalised Hessian at the estimates
+        H <- as.matrix(self$tmb_obj_joint()$he(par))
+        # Penalised Hessian: add the penalty's Hessian, Q = sum_j lambda_j S_j,
+        # on each component's spline coefficients
+        H_pen <- H
+        for(comp in c("obs", "hid")) {
+          ind <- which(names(par) == paste0("coeff_re_", comp))
+          if(length(ind) > 0) {
+            theta <- log(self[[comp]]()$lambda())
+            H_pen[ind, ind] <- H_pen[ind, ind] +
+              penalty_hessian(self[[comp]]()$terms(), theta)
+          }
         }
-        H_pen <- as.matrix(private$tmb_obj_pen_$he(par))[is_coeff, is_coeff]
-        F <- prec_to_cov(H_pen) %*% H
+        # Hat matrix over all coefficients (fixed and random)
+        is_coeff <- is_re | names(par) %in% c("coeff_fe_obs", "coeff_fe_hid")
+        F <- prec_to_cov(H_pen[is_coeff, is_coeff]) %*% H[is_coeff, is_coeff]
         edf <- edf + sum(diag(F)[is_re[is_coeff]])
       }
 
@@ -831,9 +836,6 @@ HMM <- R6Class(
       # Joint negative log-likelihood function
       private$tmb_obj_joint_ <- private$make_tmb_obj(
         bw = self$bw(), include_smooths = -1, silent = silent)
-
-      # Penalised joint likelihood, for edf(); built there when first needed
-      private$tmb_obj_pen_ <- NULL
     },
 
     #' @description Fit model using tmbstan
@@ -2340,7 +2342,6 @@ HMM <- R6Class(
     out_ = NULL,
     tmb_obj_ = NULL,
     tmb_obj_joint_ = NULL,
-    tmb_obj_pen_ = NULL,
     tmb_rep_ = NULL,
     priors_ = NULL,
     out_stan_ = NULL,

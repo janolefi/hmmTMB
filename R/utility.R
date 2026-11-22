@@ -75,6 +75,39 @@ grank <- function(x, eps = 1e-10) {
   return(sum(eigenvalues > eps))
 }
 
+#' Hessian of the smoothing penalty with respect to the spline coefficients
+#'
+#' The penalty of each smooth is 0.5 * b' Q b, with Q the sum over its
+#' penalty matrices of exp(log_lambda_j) * S_j and log_lambda = L * theta
+#' (see \code{smooth_penalty()} in src/likelihood.hpp). Its Hessian with
+#' respect to b is therefore Q, for an ordinary smooth and a Gaussian field
+#' alike; the log-determinant of Q depends on theta only. This builds that
+#' matrix for all smooths of one model component, so that the penalised
+#' Hessian with respect to the coefficients is the unpenalised one plus this,
+#' without differentiating the likelihood again.
+#'
+#' @param terms Output of \code{make_matrices()} (the \code{terms()} of an
+#' Observation or MarkovChain object)
+#' @param theta Log smoothing parameters of that component
+#'
+#' @return Matrix with one row and column per spline coefficient
+penalty_hessian <- function(terms, theta) {
+  ncol_re <- terms$ncol_re
+  log_lambda <- as.vector(terms$L %*% theta)
+  n_re <- max(ncol_re)
+  Q <- matrix(0, n_re, n_re)
+  # Penalty matrices are stacked along the diagonal of S, in the order of the
+  # columns of ncol_re, each sized to the coefficients it applies to
+  off <- 0
+  for(j in seq_len(ncol(ncol_re))) {
+    ind <- ncol_re[1, j]:ncol_re[2, j]
+    S_j <- as.matrix(terms$S[off + seq_along(ind), off + seq_along(ind)])
+    Q[ind, ind] <- Q[ind, ind] + exp(log_lambda[j]) * S_j
+    off <- off + length(ind)
+  }
+  return(Q)
+}
+
 #' All estimated parameters, in the order of the TMB parameter list
 #'
 #' \code{c(par.fixed, par.random)} is in template order only when the random
