@@ -1,6 +1,22 @@
 
 # hmmTMB 2.0.0
 
+- Add REML as a fitting method, `HMM$fit(method = "REML")`. The Laplace
+  approximation then integrates out the fixed effects along with the smooth
+  coefficients, so the outer optimisation is over the smoothing parameters
+  (and the initial distribution, if estimated) only. The inner problem is
+  larger but easier, and the outer one is usually better behaved and needs
+  fewer iterations. `HMM$method()` reports which method was used. Under REML,
+  `out()$objective` and `llk()` give the restricted likelihood, and
+  `AIC_marginal()` is unavailable since that cannot be compared across fixed
+  effect structures; everything else, including `predict()` with intervals,
+  works as before. The default remains `"ML"`.
+- Fix the smoothing penalty for splines with an unpenalised null space (e.g.
+  `bs = "tp"`, `"cr"` or `"ps"`). The log-density of the coefficients scaled
+  with log(lambda) through the number of coefficients rather than the rank of
+  the penalty, which biased smoothing parameter estimates towards
+  oversmoothing. Full-rank penalties (`"cs"`, `"re"`) and Gaussian fields are
+  unaffected. Estimates for affected models will change.
 - Add scaled chi-squared distribution "schisq"
 - Add `HMM$plot_2d()`, for plotting a model component as a surface over two
   covariates. `HMM$plot()` varies one covariate and holds the rest fixed, which
