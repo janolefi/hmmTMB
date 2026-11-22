@@ -263,6 +263,11 @@ HMM <- R6Class(
       return(private$bw_)
     },
 
+    #' @description Fitting method of the current TMB object ("ML" or "REML")
+    method = function() {
+      return(private$method_)
+    },
+
     #' @description Update bandwidth of the forward algorithm
     #'
     #' The exact forward algorithm accumulates log-likelihood contributions
@@ -693,6 +698,17 @@ HMM <- R6Class(
         tmb_par$log_lambda_hid <- log(self$lambda()$hid)
       }
 
+      # REML: the Laplace approximation also integrates out the fixed effects,
+      # so the outer parameters are the smoothing parameters (and delta0).
+      # delta0 stays outer because, for a single time series, its likelihood
+      # often increases towards the boundary of the simplex; as a random
+      # effect that leaves the inner Hessian singular and the Laplace
+      # approximation undefined, whereas the outer optimiser copes with it.
+      # (fit() only asks for REML when there are smooths.)
+      if(private$method_ == "REML") {
+        random <- c("coeff_fe_obs", "coeff_fe_hid", random)
+      }
+
       # Add custom mapping effects, i.e., add them to the map argument
       # for TMB, and create a vector of 0/1 to record which parameters
       # are estimated and which are not (used e.g. in post_coeff)
@@ -902,6 +918,19 @@ HMM <- R6Class(
     #' function \code{nlminb()}. TMB uses the Laplace approximation to integrate
     #' the random effects out of the likelihood.
     #'
+    #' With \code{method = "ML"} (default), only the coefficients of smooth
+    #' terms and random effects are integrated out, and all other parameters
+    #' are estimated jointly with the smoothing parameters. With
+    #' \code{method = "REML"}, the fixed effects are integrated out too, so the
+    #' outer optimisation is over the smoothing parameters (and the initial
+    #' distribution, if estimated) only, and the coefficients are their
+    #' penalised estimates given those. The inner problem is then larger but easier, and the outer
+    #' one is usually better behaved. Under REML, \code{out()$objective} and
+    #' \code{llk()} give the (negative) restricted likelihood, which cannot be
+    #' compared across models with different fixed effects. REML needs at
+    #' least one smooth or random effect; without one, the model is fitted by
+    #' ML.
+    #'
     #' After the model has been fitted, the output of \code{nlminb()} can be
     #' accessed using the method \code{out()}. The estimated parameters can
     #' be accessed using the methods \code{par()} (for the HMM parameters,
@@ -912,6 +941,7 @@ HMM <- R6Class(
     #' effect coefficients on the linear predictor scale).
     #'
     #' @param silent Logical. If FALSE, all tracing outputs are shown (default).
+    #' @param method Either "ML" (default) or "REML"; see Details.
     #' @param ... Other arguments to nlminb which is used to optimise the
     #' likelihood. This currently only supports the additional argument
     #' \code{control}, which is a list of control parameters such as
@@ -934,12 +964,28 @@ HMM <- R6Class(
     #'
     #' # Fit HMM
     #' hmm$fit(silent = TRUE)
-    fit = function(silent = FALSE, ...) {
+    fit = function(silent = FALSE, method = c("ML", "REML"), ...) {
+      method <- match.arg(method)
       if(!silent) self$formulation()
 
-      # Setup if necessary
-      if(is.null(private$tmb_obj_)) {
+      # REML integrates the fixed effects against the smooths, so it needs some
+      no_smooths <- is.null(self$obs()$terms()$S) & is.null(self$hid()$terms()$S)
+      if(method == "REML" & no_smooths) {
+        message("REML needs a smooth or random effect; fitting by ML instead.")
+        method <- "ML"
+      }
+
+      # Setup if necessary, or again if the method changed, because the
+      # method decides which parameters are random in the TMB object
+      if(is.null(private$tmb_obj_) || method != private$method_) {
+        private$tmb_obj_ <- NULL
+        private$method_ <- method
         self$setup(silent = silent)
+      }
+
+      if(method == "REML" & length(private$tmb_obj_$par) == 0) {
+        stop(paste("All smoothing parameters are fixed, so REML has nothing to",
+                   "estimate. Use method = \"ML\"."))
       }
 
       # Check extra arguments
@@ -2293,6 +2339,7 @@ HMM <- R6Class(
     states_ = NULL,
     bw_ = NULL,
     tmb_args_ = NULL,
+    method_ = "ML",
 
     # Reading from spec file --------------------------------------------------
 
