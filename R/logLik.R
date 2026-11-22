@@ -20,9 +20,8 @@ logLik.HMM <- function(object, ...) {
             " or splines. Use at your own risk.")
   }
   
-  par_all <- c(object$tmb_rep()$par.fixed, 
-               object$tmb_rep()$par.random)
-  val <- - object$tmb_obj_joint()$fn(par_all)
+  par <- par_all(object$tmb_rep())
+  val <- - object$tmb_obj_joint()$fn(par)
   attributes(val)$df <- object$edf()
   attributes(val)$nobs <- nrow(object$obs()$data())
   class(val) <- "logLik"

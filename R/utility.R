@@ -75,6 +75,31 @@ grank <- function(x, eps = 1e-10) {
   return(sum(eigenvalues > eps))
 }
 
+#' All estimated parameters, in the order of the TMB parameter list
+#'
+#' \code{c(par.fixed, par.random)} is in template order only when the random
+#' effects come last in the template, as they do when only the spline
+#' coefficients are random (ML). Under REML most parameters are random and
+#' that concatenation is scrambled. This puts every estimate back in place,
+#' as \code{TMB:::as.list.sdreport()} does, so that it lines up with
+#' \code{jointPrecision}, with the joint Hessian, and with
+#' \code{HMM$coeff_array()[, "fixed"]}.
+#'
+#' @param rep Output of \code{TMB::sdreport()}
+#'
+#' @return Named vector of all estimated parameters
+par_all <- function(rep) {
+  n <- length(rep$par.fixed) + length(rep$par.random)
+  is_random <- seq_len(n) %in% rep$env$random
+  par <- numeric(n)
+  par[!is_random] <- rep$par.fixed
+  par[is_random] <- rep$par.random
+  names(par) <- rep("", n)
+  names(par)[!is_random] <- names(rep$par.fixed)
+  names(par)[is_random] <- names(rep$par.random)
+  return(par)
+}
+
 #' Fill in NAs
 #' 
 #' Replace NA entries in a vector by the last non-NA value. If the first

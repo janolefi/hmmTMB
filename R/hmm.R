@@ -536,9 +536,10 @@ HMM <- R6Class(
     #' (accounting for flexibility in non-parametric
     #' terms implied by smoothing)
     edf = function() {
-      # Degrees of freedom for fixed effects
-      # (don't count smoothing parameters)
-      edf <- length(self$tmb_rep()$par.fixed)
+      # One degree of freedom for each parameter that isn't a spline
+      # coefficient (fixed effects, smoothing parameters, initial distribution)
+      par <- par_all(self$tmb_rep())
+      edf <- sum(!(names(par) %in% c("coeff_re_obs", "coeff_re_hid")))
 
       # Add random effects if needed
       if(!is.null(self$tmb_rep()$jointPrecision)) {
@@ -547,8 +548,7 @@ HMM <- R6Class(
         V <- prec_to_cov(Q)
 
         # Get Hessian
-        par_all <- c(self$tmb_rep()$par.fixed, self$tmb_rep()$par.random)
-        H <- self$tmb_obj_joint()$he(par_all)
+        H <- self$tmb_obj_joint()$he(par)
 
         # Extract covariance for random effect components
         ind_re_hid <- which(colnames(Q) == "coeff_re_hid")
@@ -1329,7 +1329,7 @@ HMM <- R6Class(
       } else { # model has random effects
         # Sample through a sparse Cholesky of the joint precision rather than
         # inverting it first; see rmvn_prec()
-        par <- c(rep$par.fixed, rep$par.random)
+        par <- par_all(rep)
         post <- rmvn_prec(n = n_post, mu = par, prec_mat = rep$jointPrecision)
       }
 
@@ -1606,7 +1606,8 @@ HMM <- R6Class(
       } else {
         V <- prec_to_cov(rep$jointPrecision)
       }
-      se <- sqrt(diag(V)[1:length(par)])
+      # V is in template order, which coeff_array()[, "fixed"] indexes
+      se <- sqrt(diag(V))
 
       # Add standard errors for fixed parameters (SE = 0)
       se_all <- rep(0, nrow(self$coeff_array()))
@@ -2220,9 +2221,9 @@ HMM <- R6Class(
     #' @return Conditional AIC
     AIC_conditional = function() {
       # Get all estimated parameters (fixed and random)
-      par_all <- c(self$tmb_rep()$par.fixed, self$tmb_rep()$par.random)
+      par <- par_all(self$tmb_rep())
 
-      llk <- - self$tmb_obj_joint()$fn(par_all)
+      llk <- - self$tmb_obj_joint()$fn(par)
       npar <- self$edf()
 
       if(nrow(self$obs()$coeff_re()) + nrow(self$hid()$coeff_re()) > 0) {
