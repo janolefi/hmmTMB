@@ -86,8 +86,8 @@ update.HMM <- function(object, type, i, j, change, fit = TRUE,
   # create new HMM object, keeping any bandwidth the user had set
   new_mod <- HMM$new(obs = new_obs, hid = new_hid, init = object, 
                      fixpar = object$fixpar(), bw = object$bw())
-  # fit new model 
-  if(fit) new_mod$fit(silent = silent) 
+  # fit new model, by the same method as the original
+  if(fit) new_mod$fit(silent = silent, method = object$method())
   # return fitted model 
   return(new_mod)
 }

@@ -865,8 +865,10 @@ HMM <- R6Class(
         }
       }
 
-      # Setup if necessary
-      if(is.null(private$tmb_obj_)) {
+      # Setup if necessary. Stan samples every parameter itself, so it gets
+      # the ML object, as it always has, even after a REML fit.
+      if(is.null(private$tmb_obj_) || private$method_ != "ML") {
+        private$method_ <- "ML"
         self$setup(silent = silent)
       }
 
@@ -2239,6 +2241,12 @@ HMM <- R6Class(
     #'
     #' @return Marginal AIC
     AIC_marginal = function() {
+      # Under REML, the objective is a restricted likelihood, which depends
+      # on the fixed effect structure and so cannot be compared across models
+      if(private$method_ == "REML") {
+        stop(paste("The marginal AIC is not defined for a model fitted by REML.",
+                   "Use AIC_conditional(), or refit with method = \"ML\"."))
+      }
       llk <- -self$out()$objective
       npar <- length(self$tmb_rep()$par.fixed)
       if(!self$hid()$stationary()) {
