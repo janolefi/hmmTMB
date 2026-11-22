@@ -544,30 +544,22 @@ HMM <- R6Class(
       # One degree of freedom for each parameter that isn't a spline
       # coefficient (fixed effects, smoothing parameters, initial distribution)
       par <- par_all(self$tmb_rep())
-      edf <- sum(!(names(par) %in% c("coeff_re_obs", "coeff_re_hid")))
+      is_re <- names(par) %in% c("coeff_re_obs", "coeff_re_hid")
+      edf <- sum(!is_re)
 
-      # Add random effects if needed
-      if(!is.null(self$tmb_rep()$jointPrecision)) {
-        # Joint covariance matrix
-        Q <- self$tmb_rep()$jointPrecision
-        V <- prec_to_cov(Q)
-
-        # Get Hessian
-        H <- self$tmb_obj_joint()$he(par)
-
-        # Extract covariance for random effect components
-        ind_re_hid <- which(colnames(Q) == "coeff_re_hid")
-        ind_re_obs <- which(colnames(Q) == "coeff_re_obs")
-        V_re_hid <- V[ind_re_hid, ind_re_hid]
-        V_re_obs <- V[ind_re_obs, ind_re_obs]
-        H_re_hid <- H[ind_re_hid, ind_re_hid]
-        H_re_obs <- H[ind_re_obs, ind_re_obs]
-
-        edf_hid <- sum(diag(H_re_hid %*% V_re_hid))
-        edf_obs <- sum(diag(H_re_obs %*% V_re_obs))
-
-        # Random effect EDF
-        edf <- edf + edf_hid + edf_obs
+      # Add the edf of the spline coefficients: the trace over them of the hat
+      # matrix F = (H + S_lambda)^-1 H, where H is the Hessian of the negative
+      # log-likelihood with respect to all coefficients (fixed and random),
+      # without the penalty, and H + S_lambda the same with it. This is
+      # conditional on lambda, as in mgcv. (The covariance from jointPrecision
+      # would not do: it also carries the uncertainty in lambda.)
+      if(any(is_re)) {
+        is_coeff <- is_re | names(par) %in% c("coeff_fe_obs", "coeff_fe_hid")
+        H <- as.matrix(self$tmb_obj_joint()$he(par))[is_coeff, is_coeff]
+        obj_pen <- private$make_tmb_obj(bw = self$bw(), include_smooths = 1)
+        H_pen <- as.matrix(obj_pen$he(par))[is_coeff, is_coeff]
+        F <- prec_to_cov(H_pen) %*% H
+        edf <- edf + sum(diag(F)[is_re[is_coeff]])
       }
 
       return(edf)

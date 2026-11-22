@@ -57,6 +57,11 @@ test_that("REML smoothing parameters match mgcv", {
   re <- hmm$coeff_re()$obs[, 1]
   expect_equal(unname(c(fe[1], re[1:9])), unname(coef(g[[1]])), tolerance = 1e-4)
   expect_equal(unname(c(fe[2], re[10:18])), unname(coef(g[[2]])), tolerance = 1e-4)
+
+  # edf() counts each coefficient by its mgcv edf, and each estimated
+  # smoothing parameter (here 2) as one more
+  edf_mgcv <- sum(sapply(g, function(m) sum(m$edf)))
+  expect_equal(hmm$edf(), edf_mgcv + 2, tolerance = 1e-4)
 })
 
 test_that("REML fits and every downstream method runs", {

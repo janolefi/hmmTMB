@@ -17,6 +17,14 @@
   the penalty, which biased smoothing parameter estimates towards
   oversmoothing. Full-rank penalties (`"cs"`, `"re"`) and Gaussian fields are
   unaffected. Estimates for affected models will change.
+- Fix `HMM$edf()` for models with smooths or random effects, and with it
+  `AIC_conditional()` and `logLik()`. The effective degrees of freedom of the
+  spline coefficients were computed from the covariance implied by
+  `jointPrecision`, which also carries the uncertainty in the smoothing
+  parameters, and from its random effect block alone. They now come from the
+  hat matrix (H + S)^-1 H over all coefficients, conditional on the smoothing
+  parameters, as in mgcv, which they match. The old values could exceed the
+  number of coefficients many times over, e.g. for random intercepts.
 - Add scaled chi-squared distribution "schisq"
 - Add `HMM$plot_2d()`, for plotting a model component as a surface over two
   covariates. `HMM$plot()` varies one covariate and holds the rest fixed, which
