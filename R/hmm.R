@@ -926,8 +926,9 @@ HMM <- R6Class(
     #' \code{method = "REML"}, the fixed effects are integrated out too, so the
     #' outer optimisation is over the smoothing parameters (and the initial
     #' distribution, if estimated) only, and the coefficients are their
-    #' penalised estimates given those. The inner problem is then larger but easier, and the outer
-    #' one is usually better behaved. Under REML, \code{out()$objective} and
+    #' penalised estimates given those. The inner problem is then larger but
+    #' easier, and the outer one is usually better behaved. Under REML,
+    #' \code{out()$objective} and
     #' \code{llk()} give the (negative) restricted likelihood, which cannot be
     #' compared across models with different fixed effects. REML needs at
     #' least one smooth or random effect; without one, the model is fitted by

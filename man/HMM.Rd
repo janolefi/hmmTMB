@@ -90,6 +90,7 @@ hmm$predict(what = "tpm", n_post = 1000)
     \item \href{#method-HMM-coeff_array}{\code{HMM$coeff_array()}}
     \item \href{#method-HMM-lambda}{\code{HMM$lambda()}}
     \item \href{#method-HMM-bw}{\code{HMM$bw()}}
+    \item \href{#method-HMM-method}{\code{HMM$method()}}
     \item \href{#method-HMM-update_bw}{\code{HMM$update_bw()}}
     \item \href{#method-HMM-check_bw}{\code{HMM$check_bw()}}
     \item \href{#method-HMM-update_par}{\code{HMM$update_par()}}
@@ -391,6 +392,18 @@ by definition (e.g., size of binomial distribution).}
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{HMM$bw()}
+    \if{html}{\out{</div>}}
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HMM-method"></a>}}
+\if{latex}{\out{\hypertarget{method-HMM-method}{}}}
+\subsection{\code{HMM$method()}}{
+  Fitting method of the current TMB object ("ML" or "REML")
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HMM$method()}
     \if{html}{\out{</div>}}
   }
 }
@@ -722,6 +735,20 @@ The negative log-likelihood of the model is minimised using the
 function \code{nlminb()}. TMB uses the Laplace approximation to integrate
 the random effects out of the likelihood.
 
+With \code{method = "ML"} (default), only the coefficients of smooth
+terms and random effects are integrated out, and all other parameters
+are estimated jointly with the smoothing parameters. With
+\code{method = "REML"}, the fixed effects are integrated out too, so the
+outer optimisation is over the smoothing parameters (and the initial
+distribution, if estimated) only, and the coefficients are their
+penalised estimates given those. The inner problem is then larger but
+easier, and the outer one is usually better behaved. Under REML,
+\code{out()$objective} and
+\code{llk()} give the (negative) restricted likelihood, which cannot be
+compared across models with different fixed effects. REML needs at
+least one smooth or random effect; without one, the model is fitted by
+ML.
+
 After the model has been fitted, the output of \code{nlminb()} can be
 accessed using the method \code{out()}. The estimated parameters can
 be accessed using the methods \code{par()} (for the HMM parameters,
@@ -732,13 +759,14 @@ the linear predictor scale), and \code{coeff_re()} (for estimated random
 effect coefficients on the linear predictor scale).
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{HMM$fit(silent = FALSE, ...)}
+    \preformatted{HMM$fit(silent = FALSE, method = c("ML", "REML"), ...)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{silent}}{Logical. If FALSE, all tracing outputs are shown (default).}
+      \item{\code{method}}{Either "ML" (default) or "REML"; see Details.}
       \item{\code{...}}{Other arguments to nlminb which is used to optimise the
 likelihood. This currently only supports the additional argument
 \code{control}, which is a list of control parameters such as
