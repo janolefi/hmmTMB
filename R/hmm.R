@@ -303,6 +303,7 @@ HMM <- R6Class(
       private$bw_ <- as.integer(bw)
       private$tmb_obj_ <- NULL
       private$tmb_obj_joint_ <- NULL
+      private$tmb_obj_pen_ <- NULL
       invisible(self)
     },
 
@@ -556,8 +557,13 @@ HMM <- R6Class(
       if(any(is_re)) {
         is_coeff <- is_re | names(par) %in% c("coeff_fe_obs", "coeff_fe_hid")
         H <- as.matrix(self$tmb_obj_joint()$he(par))[is_coeff, is_coeff]
-        obj_pen <- private$make_tmb_obj(bw = self$bw(), include_smooths = 1)
-        H_pen <- as.matrix(obj_pen$he(par))[is_coeff, is_coeff]
+        # Penalised joint likelihood, built on first use and kept until the
+        # next setup()
+        if(is.null(private$tmb_obj_pen_)) {
+          private$tmb_obj_pen_ <- private$make_tmb_obj(bw = self$bw(),
+                                                       include_smooths = 1)
+        }
+        H_pen <- as.matrix(private$tmb_obj_pen_$he(par))[is_coeff, is_coeff]
         F <- prec_to_cov(H_pen) %*% H
         edf <- edf + sum(diag(F)[is_re[is_coeff]])
       }
@@ -825,6 +831,9 @@ HMM <- R6Class(
       # Joint negative log-likelihood function
       private$tmb_obj_joint_ <- private$make_tmb_obj(
         bw = self$bw(), include_smooths = -1, silent = silent)
+
+      # Penalised joint likelihood, for edf(); built there when first needed
+      private$tmb_obj_pen_ <- NULL
     },
 
     #' @description Fit model using tmbstan
@@ -2331,6 +2340,7 @@ HMM <- R6Class(
     out_ = NULL,
     tmb_obj_ = NULL,
     tmb_obj_joint_ = NULL,
+    tmb_obj_pen_ = NULL,
     tmb_rep_ = NULL,
     priors_ = NULL,
     out_stan_ = NULL,
