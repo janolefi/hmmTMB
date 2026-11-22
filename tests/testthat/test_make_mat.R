@@ -213,3 +213,69 @@ test_that("the likelihood reads penalty weights through L", {
   p3 <- o1$par; p3[i_lam] <- theta
   expect_false(isTRUE(all.equal(o1$fn(p3), o1$fn(p1))))
 })
+
+# Penalty rank ------------------------------------------------------------
+
+test_that("rank_S is the rank of each penalty, not its dimension", {
+  set.seed(1)
+  data <- data.frame(x = stats::runif(200), g = factor(rep(1:5, 40)))
+  # After the sum-to-zero constraint, k = 6 leaves 5 coefficients. A thin
+  # plate or cubic regression spline keeps its linear part unpenalised, so
+  # its penalty has rank 4; a shrinkage basis and a random effect are full rank.
+  mats <- make_matrices(list(a = ~ s(x, k = 6, bs = "tp"),
+                             b = ~ s(x, k = 6, bs = "cr"),
+                             c = ~ s(x, k = 6, bs = "cs"),
+                             d = ~ s(g, bs = "re")),
+                        data = data)
+  expect_equal(mats$rank_S, c(4, 4, 5, 5))
+})
+
+test_that("the penalty is the log-density of the coefficients with rank(S)", {
+  set.seed(1)
+  n <- 200
+  data <- data.frame(x = seq(-3, 3, length.out = n), z = NA)
+  s <- 1
+  for(i in 1:n) {
+    data$z[i] <- stats::rnorm(1, c(0, 4)[s] + sin(data$x[i]), 0.7)
+    s <- sample(c(s, 3 - s), size = 1, prob = c(0.9, 0.1))
+  }
+  obs <- Observation$new(data = data, dists = list(z = "norm"), n_states = 2,
+                         par = list(z = list(mean = c(0, 4), sd = c(1, 1))),
+                         formulas = list(z = list(mean = ~ s(x, k = 6, bs = "tp"),
+                                                  sd = ~1)))
+  hid <- MarkovChain$new(n_states = 2, data = data)
+  hmm <- HMM$new(obs = obs, hid = hid)
+  hmm$setup(silent = TRUE)
+  args <- hmm$.__enclos_env__$private$tmb_args_
+
+  # Penalised and unpenalised objective, every parameter held fixed
+  build <- function(include_smooths) {
+    a <- args
+    a$data$include_smooths <- as.integer(include_smooths)
+    do.call(TMB::MakeADFun, c(a, list(silent = TRUE)))
+  }
+  o_pen <- build(1)
+  o_nopen <- build(-1)
+
+  # Some coefficients and smoothing parameters away from the defaults
+  par <- o_pen$par
+  i_re <- which(names(par) == "coeff_re_obs")
+  i_lam <- which(names(par) == "log_lambda_obs")
+  par[i_re] <- stats::rnorm(length(i_re))
+  par[i_lam] <- c(0.5, -1.2)
+  pen_tmb <- o_pen$fn(par) - o_nopen$fn(par)
+
+  # The same penalty, written out: minus the log-density of N(0, (lambda S)^-)
+  pen_R <- 0
+  for(j in 1:2) {
+    ind <- args$data$ncol_re_obs[1, j]:args$data$ncol_re_obs[2, j]
+    S <- as.matrix(obs$terms()$S[ind, ind])
+    b <- par[i_re][ind]
+    r <- grank(S)
+    lambda <- exp(par[i_lam][j])
+    pen_R <- pen_R + 0.5 * r * log(2 * pi) - 0.5 * gdeterminant(S) -
+      0.5 * r * log(lambda) + 0.5 * lambda * sum(b * (S %*% b))
+  }
+  expect_equal(grank(S), 4)   # rank-deficient, so the test bites
+  expect_equal(pen_tmb, unname(pen_R))
+})

@@ -28,6 +28,7 @@ A list of
   \item S Smoothness matrix
   \item log_det_S Vector of log-determinants of smoothness matrices, one
   for each penalty
+  \item rank_S Vector of ranks of smoothness matrices, one for each penalty
   \item ncol_fe Number of columns of X_fe for each parameter
   \item ncol_re Number of columns of X_re and S for each random effect
   \item L Matrix with log(lambda) = L * theta, mapping the smoothing
@@ -46,7 +47,8 @@ A list of
 Create model matrices
 }
 \details{
-Note the two indices: \code{ncol_re}, \code{log_det_S} and \code{gmrf} have
+Note the two indices: \code{ncol_re}, \code{log_det_S}, \code{rank_S} and
+\code{gmrf} have
 one entry per \emph{penalty}, while \code{L}, \code{sp_names},
 \code{sp_gmrf} and \code{theta_start} have one per \emph{smoothing
 parameter}. The two coincide for an ordinary smooth, which has one of each,

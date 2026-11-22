@@ -27,6 +27,7 @@
    DATA_SPARSE_MATRIX(X_re_obs); // design matrix for random effects
    DATA_SPARSE_MATRIX(S_obs); // penalty matrix
    DATA_VECTOR(log_det_S_obs); // log-determinant of penalty matrix
+   DATA_VECTOR(rank_S_obs); // rank of penalty matrix
    DATA_IMATRIX(ncol_re_obs); // number of columns of S and X_re for each random effect
    DATA_MATRIX(L_obs); // maps log smoothing parameters to log penalty weights
    DATA_IVECTOR(gmrf_obs); // for each penalty, 1 if its log-determinant is computed here
@@ -35,6 +36,7 @@
    DATA_SPARSE_MATRIX(X_re_hid); // design matrix for random effects
    DATA_SPARSE_MATRIX(S_hid); // penalty matrix
    DATA_VECTOR(log_det_S_hid); // log-determinant of penalty matrix
+   DATA_VECTOR(rank_S_hid); // rank of penalty matrix
    DATA_IMATRIX(ncol_re_hid); // number of columns of S and X_re for each random effect
    DATA_MATRIX(L_hid); // maps log smoothing parameters to log penalty weights
    DATA_IVECTOR(gmrf_hid); // for each penalty, 1 if its log-determinant is computed here
@@ -281,13 +283,13 @@
    // Are there smooths in the observation model?
    if((include_smooths > 0) & (ncol_re_obs(0, 0) > -1)) {
      nllk += smooth_penalty(S_obs, coeff_re_obs, log_lambda_obs, ncol_re_obs,
-                            L_obs, log_det_S_obs, gmrf_obs);
+                            L_obs, log_det_S_obs, rank_S_obs, gmrf_obs);
    }
    
    // Are there smooths in the hidden state model?
    if((include_smooths > 0) & (ncol_re_hid(0, 0) > -1)) {
      nllk += smooth_penalty(S_hid, coeff_re_hid, log_lambda_hid, ncol_re_hid,
-                            L_hid, log_det_S_hid, gmrf_hid);
+                            L_hid, log_det_S_hid, rank_S_hid, gmrf_hid);
    }
    
    return nllk;

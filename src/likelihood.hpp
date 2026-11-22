@@ -89,9 +89,10 @@ Type forward_alg_banded(const matrix<Type>& prob,
 //' order.
 //'
 //' Two cases, chosen by gmrf. A fixed penalty matrix scaled by one parameter
-//' (gmrf = 0) has log|lambda S|+ = Sn * log(lambda) + log|S|+ in closed form,
-//' with log|S|+ supplied as data; this arm is the penalty hmmTMB has always
-//' used, with log_lambda(j) in place of the old log_lambda_obs(i). A precision
+//' (gmrf = 0) has log|lambda S|+ = rank(S) * log(lambda) + log|S|+ in closed
+//' form, with log|S|+ and rank(S) supplied as data. The rank, not the number
+//' of coefficients, multiplies log(lambda): a spline's unpenalised null space
+//' carries no prior information about lambda. A precision
 //' that depends on the parameters through more than an overall scale
 //' (gmrf = 1), as an SPDE field's does, needs its log-determinant
 //' differentiated, which density::GMRF does with a sparse Cholesky.
@@ -102,6 +103,7 @@ Type forward_alg_banded(const matrix<Type>& prob,
 //' @param ncol_re 2 x n_pen; first and last coefficient each penalty applies to
 //' @param L n_pen x n_theta matrix with log(lambda) = L * theta
 //' @param log_det_S Log generalised determinant of each penalty matrix
+//' @param rank_S Rank of each penalty matrix
 //' @param gmrf For each penalty, 1 if its log-determinant is computed here
 //' @return Negative log-density of the penalised coefficients
 template<class Type>
@@ -111,6 +113,7 @@ Type smooth_penalty(const Eigen::SparseMatrix<Type>& S,
                     const matrix<int>& ncol_re,
                     const matrix<Type>& L,
                     const vector<Type>& log_det_S,
+                    const vector<Type>& rank_S,
                     const vector<int>& gmrf) {
   int n_pen = ncol_re.cols();
   vector<Type> log_lambda = L * theta;
@@ -127,9 +130,9 @@ Type smooth_penalty(const Eigen::SparseMatrix<Type>& S,
     if(gmrf(i) == 0) {
       for(int j = i; j <= last; j++, off += Sn) {
         Eigen::SparseMatrix<Type> this_S = S.block(off, off, Sn, Sn);
-        pen += Type(0.5) * Sn * log(2*M_PI) -
+        pen += Type(0.5) * rank_S(j) * log(2*M_PI) -
           Type(0.5) * log_det_S(j) -
-          Type(0.5) * Sn * log_lambda(j) +
+          Type(0.5) * rank_S(j) * log_lambda(j) +
           Type(0.5) * exp(log_lambda(j)) * density::GMRF(this_S).Quadform(this_coeff_re);
       }
     } else {

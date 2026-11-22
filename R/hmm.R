@@ -618,6 +618,7 @@ HMM <- R6Class(
       X_re_obs <- mod_mat_obs$X_re
       S_obs <- mod_mat_obs$S
       log_det_S_obs <- mod_mat_obs$log_det_S
+      rank_S_obs <- mod_mat_obs$rank_S
       ncol_re_obs <- mod_mat_obs$ncol_re
       L_obs <- mod_mat_obs$L
       gmrf_obs <- mod_mat_obs$gmrf
@@ -629,6 +630,7 @@ HMM <- R6Class(
       X_re_hid <- mod_mat_hid$X_re
       S_hid <- mod_mat_hid$S
       log_det_S_hid <- mod_mat_hid$log_det_S
+      rank_S_hid <- mod_mat_hid$rank_S
       ncol_re_hid <- mod_mat_hid$ncol_re
       L_hid <- mod_mat_hid$L
       gmrf_hid <- mod_mat_hid$gmrf
@@ -657,6 +659,7 @@ HMM <- R6Class(
                            log_lambda_obs = factor(NA)))
         S_obs <- as_sparse(matrix(0, 1, 1))
         log_det_S_obs <- -1
+        rank_S_obs <- -1
         ncol_re_obs <- matrix(-1, nr = 1, nc = 1)
         L_obs <- matrix(1, 1, 1)
         gmrf_obs <- 0L
@@ -677,6 +680,7 @@ HMM <- R6Class(
                            log_lambda_hid = factor(NA)))
         S_hid <- as_sparse(matrix(0, 1, 1))
         log_det_S_hid <- -1
+        rank_S_hid <- -1
         ncol_re_hid <- matrix(-1, nr = 1, nc = 1)
         L_hid <- matrix(1, 1, 1)
         gmrf_hid <- 0L
@@ -761,6 +765,7 @@ HMM <- R6Class(
                       X_re_obs = as_sparse(X_re_obs),
                       S_obs = as_sparse(S_obs),
                       log_det_S_obs = log_det_S_obs,
+                      rank_S_obs = rank_S_obs,
                       ncol_re_obs = ncol_re_obs,
                       L_obs = L_obs,
                       gmrf_obs = gmrf_obs,
@@ -768,6 +773,7 @@ HMM <- R6Class(
                       X_re_hid = as_sparse(X_re_hid),
                       S_hid = as_sparse(S_hid),
                       log_det_S_hid = log_det_S_hid,
+                      rank_S_hid = rank_S_hid,
                       ncol_re_hid = ncol_re_hid,
                       L_hid = L_hid,
                       gmrf_hid = gmrf_hid,

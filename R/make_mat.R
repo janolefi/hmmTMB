@@ -18,6 +18,7 @@
 #'   \item S Smoothness matrix
 #'   \item log_det_S Vector of log-determinants of smoothness matrices, one
 #'   for each penalty
+#'   \item rank_S Vector of ranks of smoothness matrices, one for each penalty
 #'   \item ncol_fe Number of columns of X_fe for each parameter
 #'   \item ncol_re Number of columns of X_re and S for each random effect
 #'   \item L Matrix with log(lambda) = L * theta, mapping the smoothing
@@ -33,7 +34,8 @@
 #' }
 #'
 #' @details
-#' Note the two indices: \code{ncol_re}, \code{log_det_S} and \code{gmrf} have
+#' Note the two indices: \code{ncol_re}, \code{log_det_S}, \code{rank_S} and
+#' \code{gmrf} have
 #' one entry per \emph{penalty}, while \code{L}, \code{sp_names},
 #' \code{sp_gmrf} and \code{theta_start} have one per \emph{smoothing
 #' parameter}. The two coincide for an ordinary smooth, which has one of each,
@@ -51,6 +53,7 @@ make_matrices = function(formulas, data, new_data = NULL, gam_args = NULL) {
   names_re <- NULL
   names_ncol_re <- NULL
   log_det_S <- NULL
+  rank_S <- NULL
   L_list <- list()
   gmrf <- NULL
   sp_gmrf <- NULL
@@ -159,6 +162,10 @@ make_matrices = function(formulas, data, new_data = NULL, gam_args = NULL) {
         # predictor with several smooths needs them apart.
         log_det_S <- c(log_det_S, if(is_gmrf) rep(0, npen)
                        else vapply(sm$S, gdeterminant, numeric(1)))
+        # Rank of each penalty, which multiplies log(lambda) in the
+        # log-density (unused for a Gaussian field, like log_det_S)
+        rank_S <- c(rank_S, if(is_gmrf) rep(0, npen)
+                    else vapply(sm$S, grank, numeric(1)))
         
         L_sm <- if(is.null(sm$L)) diag(npen) else as.matrix(sm$L)
         L_list <- c(L_list, list(L_sm))
@@ -195,6 +202,7 @@ make_matrices = function(formulas, data, new_data = NULL, gam_args = NULL) {
               # as.numeric so that this is double(0), not NULL, when no
               # formula has a smooth
               log_det_S = as.numeric(log_det_S),
+              rank_S = as.numeric(rank_S),
               X_list_fe = X_list_fe, 
               X_list_re = X_list_re, 
               S_list = S_list, 

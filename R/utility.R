@@ -54,8 +54,25 @@ gdeterminant <- function(x, eps = 1e-10, log = TRUE) {
       return(exp(logdet))
     } else{
       return(logdet)
-    }        
+    }
   }
+}
+
+#' Rank of a penalty matrix
+#'
+#' Number of non-zero eigenvalues, counted with the same threshold as
+#' \code{gdeterminant()}, so that the two describe the same eigenvalues.
+#' A penalty with an unpenalised null space (e.g. the linear part of a thin
+#' plate spline) has rank smaller than its dimension, and the log-density of
+#' its coefficients scales with lambda through the rank, not the dimension.
+#'
+#' @param x Numeric matrix
+#' @param eps Threshold below which eigenvalues are ignored (default: 1e-10)
+#'
+#' @return Rank of input matrix
+grank <- function(x, eps = 1e-10) {
+  eigenvalues <- eigen(x)$values
+  return(sum(eigenvalues > eps))
 }
 
 #' Fill in NAs
